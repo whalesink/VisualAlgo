@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A* Algorithm Visualization</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            border: 1px solid #000;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="800"></canvas>
+    <button id="startButton">Start A*</button>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startButton = document.getElementById('startButton');
+        const rows = 100;
+        const cols = 100;
+        const cellSize = canvas.width / cols;
+        let grid = [];
+        let startNode, endNode;
+        let isSearching = false;
+
+        function initGrid() {
+            grid = [];
+            for (let row = 0; row < rows; row++) {
+                const rowArray = [];
+                for (let col = 0; col < cols; col++) {
+                    rowArray.push({
+                        x: col,
+                        y: row,
+                        f: 0,
+                        g: 0,
+                        h: 0,
+                        neighbors: [],
+                        previous: undefined,
+                        wall: Math.random() < 0.3 // Random walls
+                    });
+                }
+                grid.push(rowArray);
+            }
+            startNode = grid[0][0];
+            endNode = grid[rows - 1][cols - 1];
+            startNode.wall = false;
+            endNode.wall = false;
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    grid[row][col].neighbors = getNeighbors(grid[row][col]);
+                }
+            }
+        }
+
+        function getNeighbors(node) {
+            const neighbors = [];
+            const { x, y } = node;
+            if (x > 0) neighbors.push(grid[y][x - 1]);
+            if (x < cols - 1) neighbors.push(grid[y][x + 1]);
+            if (y > 0) neighbors.push(grid[y - 1][x]);
+            if (y < rows - 1) neighbors.push(grid[y + 1][x]);
+            return neighbors;
+        }
+
+        function heuristic(a, b) {
+            return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        }
+
+        async function aStar(start, end) {
+            let openSet = [start];
+            let closedSet = [];
+            while (openSet.length > 0) {
+                let lowestIndex = 0;
+                for (let i = 0; i < openSet.length; i++) {
+                    if (openSet[i].f < openSet[lowestIndex].f) {
+                        lowestIndex = i;
+                    }
+                }
+                let current = openSet[lowestIndex];
+                if (current === end) {
+                    let temp = current;
+                    while (temp.previous) {
+                        temp = temp.previous;
+                        temp.path = true;
+                        drawGrid();
+                        await new Promise(r => setTimeout(r, 50));
+                    }
+                    isSearching = false;
+                    return;
+                }
+                openSet = openSet.filter(node => node !== current);
+                closedSet.push(current);
+
+                for (let neighbor of current.neighbors) {
+                    if (!closedSet.includes(neighbor) && !neighbor.wall) {
+                        let tempG = current.g + 1;
+                        let newPath = false;
+                        if (openSet.includes(neighbor)) {
+                            if (tempG < neighbor.g) {
+                                neighbor.g = tempG;
+                                newPath = true;
+                            }
+                        } else {
+                            neighbor.g = tempG;
+                            newPath = true;
+                            openSet.push(neighbor);
+                        }
+                        if (newPath) {
+                            neighbor.h = heuristic(neighbor, end);
+                            neighbor.f = neighbor.g + neighbor.h;
+                            neighbor.previous = current;
+                        }
+                    }
+                }
+                drawGrid();
+                await new Promise(r => setTimeout(r, 50));
+            }
+            isSearching = false;
+        }
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const node = grid[row][col];
+                    ctx.fillStyle = node.wall ? 'black' : 'white';
+                    if (node === startNode) ctx.fillStyle = 'green';
+                    if (node === endNode) ctx.fillStyle = 'red';
+                    if (node.path) ctx.fillStyle = 'blue';
+                    ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                    ctx.strokeRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        startButton.addEventListener('click', () => {
+            if (!isSearching) {
+                isSearching = true;
+                aStar(startNode, endNode);
+            }
+        });
+
+        initGrid();
+        drawGrid();
+    </script>
+</body>
+</html>

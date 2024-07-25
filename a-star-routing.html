@@ -7,7 +7,7 @@
 		<style>
 			body {
 				display: flex;
-				flex-direction: column;
+				flex-direction: row;
 				align-items: center;
 				justify-content: center;
 				height: 100vh;
@@ -17,16 +17,81 @@
 			canvas {
 				border: 1px solid #000;
 			}
+			#controls {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				margin-left: 20px;
+			}
 			button {
 				margin: 10px;
 				padding: 10px 20px;
 				font-size: 16px;
 			}
+			#legend {
+				margin-top: 20px;
+			}
+			.legend-item {
+				display: flex;
+				align-items: center;
+				margin: 5px 0;
+			}
+			.legend-color {
+				width: 20px;
+				height: 20px;
+				margin-right: 10px;
+			}
 		</style>
 	</head>
 	<body>
 		<canvas id="canvas" width="800" height="800"></canvas>
-		<button id="startButton">Start A*</button>
+		<div id="controls">
+			<button id="startButton">Start A*</button>
+			<div id="legend">
+				<div class="legend-item">
+					<div
+						class="legend-color"
+						style="background-color: green"
+					></div>
+					<span>Start/起点</span>
+				</div>
+				<div class="legend-item">
+					<div
+						class="legend-color"
+						style="background-color: red"
+					></div>
+					<span>End/终点</span>
+				</div>
+				<div class="legend-item">
+					<div
+						class="legend-color"
+						style="background-color: black"
+					></div>
+					<span>Wall/墙</span>
+				</div>
+				<div class="legend-item">
+					<div
+						class="legend-color"
+						style="background-color: orange"
+					></div>
+					<span>Visited/已访问</span>
+				</div>
+				<div class="legend-item">
+					<div
+						class="legend-color"
+						style="background-color: yellow"
+					></div>
+					<span>Next to visit/下一次访问</span>
+				</div>
+				<div class="legend-item">
+					<div
+						class="legend-color"
+						style="background-color: blue"
+					></div>
+					<span>Path/最短路径</span>
+				</div>
+			</div>
+		</div>
 		<script>
 			const canvas = document.getElementById("canvas");
 			const ctx = canvas.getContext("2d");
@@ -39,6 +104,13 @@
 			let isSearching = false;
 
 			function initGrid() {
+				do {
+					generateGrid();
+					setNeighbors();
+				} while (!isSolvable(startNode, endNode));
+			}
+
+			function generateGrid() {
 				grid = [];
 				for (let row = 0; row < rows; row++) {
 					const rowArray = [];
@@ -60,6 +132,9 @@
 				endNode = grid[rows - 1][cols - 1];
 				startNode.wall = false;
 				endNode.wall = false;
+			}
+
+			function setNeighbors() {
 				for (let row = 0; row < rows; row++) {
 					for (let col = 0; col < cols; col++) {
 						grid[row][col].neighbors = getNeighbors(grid[row][col]);
@@ -79,6 +154,48 @@
 
 			function heuristic(a, b) {
 				return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+			}
+
+			function isSolvable(start, end) {
+				const openSet = [start];
+				const closedSet = [];
+				while (openSet.length > 0) {
+					let lowestIndex = 0;
+					for (let i = 0; i < openSet.length; i++) {
+						if (openSet[i].f < openSet[lowestIndex].f) {
+							lowestIndex = i;
+						}
+					}
+					let current = openSet[lowestIndex];
+					if (current === end) {
+						return true;
+					}
+					openSet.splice(lowestIndex, 1);
+					closedSet.push(current);
+
+					for (let neighbor of current.neighbors) {
+						if (!closedSet.includes(neighbor) && !neighbor.wall) {
+							let tempG = current.g + 1;
+							let newPath = false;
+							if (openSet.includes(neighbor)) {
+								if (tempG < neighbor.g) {
+									neighbor.g = tempG;
+									newPath = true;
+								}
+							} else {
+								neighbor.g = tempG;
+								newPath = true;
+								openSet.push(neighbor);
+							}
+							if (newPath) {
+								neighbor.h = heuristic(neighbor, end);
+								neighbor.f = neighbor.g + neighbor.h;
+								neighbor.previous = current;
+							}
+						}
+					}
+				}
+				return false;
 			}
 
 			async function aStar(start, end) {
@@ -102,7 +219,7 @@
 						isSearching = false;
 						return;
 					}
-					openSet = openSet.filter((node) => node !== current);
+					openSet.splice(lowestIndex, 1);
 					closedSet.push(current);
 
 					for (let neighbor of current.neighbors) {
@@ -127,7 +244,7 @@
 						}
 					}
 					drawGrid(openSet, closedSet);
-					await new Promise((r) => setTimeout(r, 50));
+					await new Promise((r) => setTimeout(r, 5));
 				}
 				isSearching = false;
 			}
